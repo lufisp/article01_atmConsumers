@@ -67,7 +67,7 @@ object AtmConsumerWHbase {
     println("Reading Total Cash from Hbase");
     val hbaseRDD = sc.newAPIHadoopRDD(hConf,classOf[TableInputFormat],classOf[ImmutableBytesWritable],classOf[Result])
     
-    val currentCashRdd = hbaseRDD.map(tuple => tuple._2)
+    var currentCashRdd = hbaseRDD.map(tuple => tuple._2)
       .map(result => (Bytes.toString(result.getRow()), Bytes.toInt(result.value())))
     
     currentCashRdd.foreach(x => println("Key:" + x._1 + "  Value: "+ x._2));
@@ -85,12 +85,16 @@ object AtmConsumerWHbase {
       })
         .reduceByKey((a, b) => a + b)
         
+      currentCashRdd = reducedRdd.union(currentCashRdd).reduceByKey((a,b)=>(a+b))  
         
-
-      /*saving the values in Hbase*/  
-      reducedRdd.map(row => rowToPut(row._1,row._2)).saveAsNewAPIHadoopDataset(jobConfig)  
+      val rddToKafka_and_db = currentCashRdd.subtractByKey(currentCashRdd.subtractByKey(reducedRdd)) 
       
-      reducedRdd.foreachPartition(x => {
+      rddToKafka_and_db.foreach(println)
+      
+      /*saving the values in Hbase*/  
+      rddToKafka_and_db.map(row => rowToPut(row._1,row._2)).saveAsNewAPIHadoopDataset(jobConfig)  
+      
+      rddToKafka_and_db.foreachPartition(x => {
         val props: Properties = new Properties;
         props.put("bootstrap.servers", "localhost:9092,localhost:9093");
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
