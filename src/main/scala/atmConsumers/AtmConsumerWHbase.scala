@@ -70,7 +70,7 @@ object AtmConsumerWHbase {
     var currentCashRdd = hbaseRDD.map(tuple => tuple._2)
       .map(result => (Bytes.toString(result.getRow()), Bytes.toInt(result.value())))
     
-    currentCashRdd.foreach(x => println("Key:" + x._1 + "  Value: "+ x._2));
+    //currentCashRdd.foreach(x => println("Key:" + x._1 + "  Value: "+ x._2));
       
 
     directKafkaStream.foreachRDD(rdd => {
@@ -89,11 +89,12 @@ object AtmConsumerWHbase {
         
       val rddToKafka_and_db = currentCashRdd.subtractByKey(currentCashRdd.subtractByKey(reducedRdd)) 
       
-      rddToKafka_and_db.foreach(println)
+      //rddToKafka_and_db.foreach(println)
       
       /*saving the values in Hbase*/  
       rddToKafka_and_db.map(row => rowToPut(row._1,row._2)).saveAsNewAPIHadoopDataset(jobConfig)  
       
+      /*saving the values in kafka*/
       rddToKafka_and_db.foreachPartition(x => {
         val props: Properties = new Properties;
         props.put("bootstrap.servers", "localhost:9092,localhost:9093");
